@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Scraped Data</title>
+    <style>
+      .article {
+        margin: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+      }
+      .date {
+        color: #666;
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Scraped Articles</h1>
+    {{range .Data}}
+    <div class="article">
+      <h2><a href="{{.Link}}">{{.Title}}</a></h2>
+      <p class="date">{{.Date.Format "2006-01-02"}}</p>
+    </div>
+    {{end}}
+  </body>
+</html>

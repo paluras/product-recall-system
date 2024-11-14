@@ -1,0 +1,42 @@
+<!-- ui/html/layouts/base.tmpl -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{template "title" .}} - Product Recalls ANSVSA</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .product {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .product h2 {
+        margin-top: 0;
+        color: #2c3e50;
+      }
+      .product a {
+        color: #2980b9;
+        text-decoration: none;
+      }
+      .product a:hover {
+        text-decoration: underline;
+      }
+      .meta {
+        color: #7f8c8d;
+        font-size: 0.9em;
+      }
+      .date {
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <main>{{template "main" .}}</main>
+  </body>
+</html>
