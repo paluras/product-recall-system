@@ -1,25 +1,45 @@
+<!-- web/templates/home.html -->
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Scraped Data</title>
+    <title>Latest Recalls</title>
     <style>
-      .article {
-        margin: 20px;
-        padding: 15px;
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .item {
         border: 1px solid #ddd;
+        margin-bottom: 20px;
+        padding: 15px;
+        border-radius: 5px;
+      }
+      .item:hover {
+        background-color: #f9f9f9;
       }
       .date {
         color: #666;
         font-size: 0.9em;
       }
+      .title {
+        color: #333;
+        text-decoration: none;
+        font-weight: bold;
+      }
+      .title:hover {
+        color: #0066cc;
+      }
     </style>
   </head>
   <body>
-    <h1>Scraped Articles</h1>
-    {{range .Data}}
-    <div class="article">
-      <h2><a href="{{.Link}}">{{.Title}}</a></h2>
-      <p class="date">{{.Date.Format "2006-01-02"}}</p>
+    <h1>Latest Product Recalls</h1>
+
+    {{range .}}
+    <div class="item">
+      <a href="{{.Link}}" class="title" target="_blank">{{.Title}}</a>
+      <div class="date">Posted: {{.Date.Format "02/01/2006"}}</div>
     </div>
     {{end}}
   </body>

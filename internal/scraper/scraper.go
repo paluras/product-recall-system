@@ -16,7 +16,9 @@ type ScrapedData struct {
 	Date  time.Time
 }
 
-func Scrape(url string) ([]ScrapedData, error) {
+const ScraperURL = "https://www.ansvsa.ro/informatii-pentru-public/produse-rechemateretrase/"
+
+func Scrape() ([]ScrapedData, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -26,7 +28,7 @@ func Scrape(url string) ([]ScrapedData, error) {
 		},
 	}
 
-	resp, err := client.Get(url)
+	resp, err := client.Get(ScraperURL)
 	if err != nil {
 		return nil, err
 	}
