@@ -1,11 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"log"
+	"log/slog"
+	"net/http"
 	"os"
+	"time"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/paluras/product-recall-system/configs"
 	"github.com/paluras/product-recall-system/internal/models"
 )
@@ -15,6 +18,8 @@ type application struct {
 	infoLog   *log.Logger
 	templates *template.Template
 	db        *models.DB
+	session   *scs.SessionManager
+	logger    *slog.Logger
 }
 
 func main() {
@@ -22,13 +27,22 @@ func main() {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 	conf := configs.ParseFlags()
 
-	templates, err := template.ParseFiles("./ui/html/pages/home.html")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	session := scs.New()
+	session.Lifetime = 24 * time.Hour
+	session.Cookie.Persist = true
+	session.Cookie.SameSite = http.SameSiteLaxMode
+	session.Cookie.Secure = false // set to true in production
+
+	templates, err := template.ParseFiles(
+		"./ui/html/pages/home.html",
+		"./ui/html/pages/unsubscribe.html")
 	if err != nil {
-		errorLog.Fatal(err)
+		logger.Error("Template error")
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
-		conf.DBUser, conf.DBPassword, conf.DBHost, conf.DBName)
+	dsn := conf.DSN()
 
 	db, err := models.NewDB(dsn)
 	if err != nil {
@@ -41,10 +55,22 @@ func main() {
 		infoLog:   infoLog,
 		templates: templates,
 		db:        db,
+		session:   session,
+		logger:    logger,
+	}
+
+	subscribers, err := app.db.GetSubscribersMail()
+	if err != nil {
+		logger.Info("No subscribers")
+	}
+
+	for _, subscriber := range subscribers {
+		logger.Info("Subscribers=", "subscribers", subscriber)
 	}
 
 	err = app.serve()
 	if err != nil {
-		errorLog.Fatal(err)
+		logger.Error(err.Error())
+		os.Exit(1)
 	}
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/paluras/product-recall-system/configs"
@@ -12,9 +11,7 @@ import (
 func main() {
 	conf := configs.ParseFlags()
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
-		conf.DBUser, conf.DBPassword, conf.DBHost, conf.DBName)
-
+	dsn := conf.DSN()
 	db, err := models.NewDB(dsn)
 	if err != nil {
 		log.Fatal(err)

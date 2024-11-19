@@ -1,0 +1,144 @@
+{{define "unsubscribe.html"}}
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dezabonare</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --black: #000000;
+        --white: #ffffff;
+        --accent: #ff0000;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: monospace;
+        background-color: var(--white);
+        color: var(--black);
+        line-height: 1.2;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem;
+        border: 3px solid var(--black);
+      }
+
+      .logo {
+        width: 60px;
+        height: 60px;
+        background: var(--black);
+        position: relative;
+        margin-bottom: 2rem;
+        display: inline-block;
+      }
+
+      .logo::after {
+        content: "!";
+        position: absolute;
+        color: var(--white);
+        font-size: 40px;
+        font-weight: bold;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      h1 {
+        font-size: 3rem;
+        margin-bottom: 2rem;
+        text-transform: uppercase;
+        font-weight: bold;
+        border-bottom: 3px solid var(--black);
+        padding-bottom: 1rem;
+      }
+
+      .message-container {
+        border: 3px solid var(--black);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        text-align: center;
+      }
+
+      .message {
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+      }
+
+      .home-link {
+        display: inline-block;
+        background-color: var(--black);
+        color: var(--white);
+        padding: 1rem 2rem;
+        text-decoration: none;
+        font-family: monospace;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+
+      .home-link:hover {
+        background-color: var(--accent);
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 1rem;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: var(--black);
+          color: var(--white);
+          border-color: var(--white);
+        }
+
+        .logo {
+          background: var(--white);
+        }
+
+        .logo::after {
+          color: var(--black);
+        }
+
+        h1 {
+          border-bottom-color: var(--white);
+        }
+
+        .message-container {
+          border-color: var(--white);
+        }
+
+        .home-link {
+          background-color: var(--white);
+          color: var(--black);
+        }
+
+        .home-link:hover {
+          background-color: var(--accent);
+          color: var(--white);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="logo"></div>
+    <h1>DEZABONARE</h1>
+
+    <div class="message-container">
+      {{if .Success}}
+      <div class="message">{{.Success}}</div>
+      {{end}}
+      <a href="/" class="home-link">Înapoi la Pagina Principală</a>
+    </div>
+  </body>
+</html>
+{{end}}

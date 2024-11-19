@@ -1,45 +1,258 @@
-<!-- web/templates/home.html -->
 <!DOCTYPE html>
 <html>
   <head>
     <title>Latest Recalls</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
+      :root {
+        --black: #000000;
+        --white: #ffffff;
+        --accent: #ff0000;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
       body {
-        font-family: Arial, sans-serif;
-        max-width: 1200px;
+        font-family: monospace;
+        background-color: var(--white);
+        color: var(--black);
+        line-height: 1.2;
+        max-width: 1000px;
         margin: 0 auto;
-        padding: 20px;
+        padding: 2rem;
+        border: 3px solid var(--black);
       }
-      .item {
-        border: 1px solid #ddd;
-        margin-bottom: 20px;
-        padding: 15px;
-        border-radius: 5px;
+
+      .logo {
+        width: 60px;
+        height: 60px;
+        background: var(--black);
+        position: relative;
+        margin-bottom: 2rem;
+        display: inline-block;
       }
-      .item:hover {
-        background-color: #f9f9f9;
-      }
-      .date {
-        color: #666;
-        font-size: 0.9em;
-      }
-      .title {
-        color: #333;
-        text-decoration: none;
+
+      .logo::after {
+        content: "!";
+        position: absolute;
+        color: var(--white);
+        font-size: 40px;
         font-weight: bold;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
       }
+
+      h1 {
+        font-size: 3rem;
+        margin-bottom: 2rem;
+        text-transform: uppercase;
+        font-weight: bold;
+        border-bottom: 3px solid var(--black);
+        padding-bottom: 1rem;
+      }
+
+      .subscribe-container {
+        border: 3px solid var(--black);
+        padding: 2rem;
+        margin-bottom: 2rem;
+      }
+
+      form {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+
+      input[type="email"] {
+        width: 100%;
+        padding: 1rem;
+        border: 3px solid var(--black);
+        font-family: monospace;
+        font-size: 1rem;
+      }
+
+      input[type="email"]:focus {
+        outline: none;
+        background: #eee;
+      }
+
+      button {
+        background-color: var(--black);
+        color: var(--white);
+        padding: 1rem 2rem;
+        border: none;
+        font-family: monospace;
+        font-weight: bold;
+        cursor: pointer;
+        text-transform: uppercase;
+      }
+
+      button:hover {
+        background-color: var(--accent);
+      }
+
+      .item {
+        border: 3px solid var(--black);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .item:hover {
+        background-color: #eee;
+      }
+
+      .title {
+        display: block;
+        color: var(--black);
+        text-decoration: none;
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+      }
+
       .title:hover {
-        color: #0066cc;
+        color: var(--accent);
+        text-decoration: underline;
+      }
+
+      .date {
+        font-family: monospace;
+        border-top: 1px solid var(--black);
+        padding-top: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 1rem;
+        }
+
+        form {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: var(--black);
+          color: var(--white);
+          border-color: var(--white);
+        }
+
+        .logo {
+          background: var(--white);
+        }
+
+        .logo::after {
+          color: var(--black);
+        }
+
+        h1 {
+          border-bottom-color: var(--white);
+        }
+
+        .subscribe-container {
+          border-color: var(--white);
+        }
+
+        input[type="email"] {
+          background: var(--black);
+          border-color: var(--white);
+          color: var(--white);
+        }
+
+        input[type="email"]:focus {
+          background: #333;
+        }
+
+        button {
+          background-color: var(--white);
+          color: var(--black);
+        }
+
+        .item {
+          border-color: var(--white);
+        }
+
+        .item:hover {
+          background-color: #333;
+        }
+
+        .title {
+          color: var(--white);
+        }
+
+        .date {
+          border-top-color: var(--white);
+        }
       }
     </style>
   </head>
   <body>
-    <h1>Latest Product Recalls</h1>
+    <div class="logo"></div>
+    <h1>PRODUSE RETRASE</h1>
+    {{if .Error}}
+    <div
+      style="
+        color: red;
+        padding: 1rem;
+        border: 2px solid red;
+        margin-bottom: 1rem;
+      "
+    >
+      {{.Error}}
+    </div>
+    {{end}} {{if .Success}}
+    <div
+      style="
+        color: green;
+        padding: 1rem;
+        border: 2px solid green;
+        margin-bottom: 1rem;
+      "
+    >
+      {{.Success}}
+    </div>
+    {{end}}
 
-    {{range .}}
+    <div class="subscribe-container">
+      <form action="/subscribe" method="POST">
+        <div class="input-group">
+          <label for="subscribe"
+            >PRIMESTE ULTIMELE INFORMATII DESPRE PRODUSELE RETRASE</label
+          >
+          <input
+            id="subscribe"
+            name="subscribe"
+            type="email"
+            placeholder="your@email.com"
+            required
+          />
+        </div>
+        <button type="submit">Subscribe</button>
+      </form>
+    </div>
+
+    {{range .Recalls}}
     <div class="item">
       <a href="{{.Link}}" class="title" target="_blank">{{.Title}}</a>
-      <div class="date">Posted: {{.Date.Format "02/01/2006"}}</div>
+      <div class="date">POSTED: {{.Date.Format "02/01/2006"}}</div>
     </div>
     {{end}}
   </body>

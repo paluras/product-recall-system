@@ -1,0 +1,5 @@
+run-scraper-and-notify.sh
+scraper.log
+.env
+backupnginx.md
+scripts/migrations/dump.sql

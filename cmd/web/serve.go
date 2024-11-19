@@ -7,9 +7,9 @@ import (
 func (app *application) serve() error {
 	srv := &http.Server{
 		Addr:    ":54321",
-		Handler: app.routes(),
+		Handler: app.session.LoadAndSave(app.routes()),
 	}
 
-	app.infoLog.Printf("Starting server on %s", srv.Addr)
+	app.logger.Info("Starting server ", "addr", srv.Addr)
 	return srv.ListenAndServe()
 }

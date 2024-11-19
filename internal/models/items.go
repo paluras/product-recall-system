@@ -103,3 +103,40 @@ func (db *DB) GetLatestItems(limit int) ([]ScrapedItem, error) {
 
 	return items, nil
 }
+
+func (db *DB) GetUnnotifiedItems() ([]ScrapedItem, error) {
+	query := `
+        SELECT id, title, link, date, created_at
+        FROM scraped_items
+        WHERE notified = FALSE
+        ORDER BY date DESC
+    `
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []ScrapedItem
+	for rows.Next() {
+		var item ScrapedItem
+		err := rows.Scan(
+			&item.ID,
+			&item.Title,
+			&item.Link,
+			&item.Date,
+			&item.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (db *DB) MarkAsNotified(itemID int) error {
+	query := `UPDATE scraped_items SET notified = TRUE WHERE id = ?`
+	_, err := db.Exec(query, itemID)
+	return err
+}
