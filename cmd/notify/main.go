@@ -20,7 +20,7 @@ func main() {
 
 	awsConfig := notify.AWSConfig{
 		Region:    "eu-central-1",
-		FromEmail: "alert@latest.produseretrase.eu",
+		FromEmail: "Latest Alert <alert@latest.produseretrase.eu>",
 	}
 
 	emailService, err := notify.NewEmailService(awsConfig, db)

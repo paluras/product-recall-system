@@ -1,0 +1,59 @@
+package utils
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"log"
+	"net/http"
+)
+
+func CreateTLSConfig() *tls.Config {
+	// Ansvsa certificate
+	letsEncryptRootCert := `-----BEGIN CERTIFICATE-----
+MIIE6zCCA9OgAwIBAgISBE3eXT/gcNQIaRRUwYX/CUWXMA0GCSqGSIb3DQEBCwUA
+MDMxCzAJBgNVBAYTAlVTMRYwFAYDVQQKEw1MZXQncyBFbmNyeXB0MQwwCgYDVQQD
+EwNSMTAwHhcNMjQxMDA3MTAzMDE5WhcNMjUwMTA1MTAzMDE4WjAYMRYwFAYDVQQD
+Ew13d3cuYW5zdnNhLnJvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA
+xsU+g0Ak3bggI4LIV3iOs/fYBQiK/OoVlMelq8i/rKNtYD3CBU6vYvuYf/BTvopB
+ZtNOCH4yNV4rGvcCJv1l+jXf5485Na1CQKbdRIKZXIuCL9HJpmftvncF75aFd8Nr
+R2hcY0M19zEKoTJ1OR9cYd1vZIAyr4gGlzvT7LtmfRUnos+3ZV9huclBdNyOl91t
+mhFLNiAv0Db3yJr8GR+l4AAosxSGWyweFaLDthtK9TyUVffGItk3uYRkLHp8PTQe
+w9kRuMAP+BqVMuacN82WcJqJUfWcECOE5dKL723RzyWlWyVLiTilJSyc9CHtONfj
+0FvoryOCzJhNzSihF8xsBwIDAQABo4ICEjCCAg4wDgYDVR0PAQH/BAQDAgWgMB0G
+A1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAMBgNVHRMBAf8EAjAAMB0GA1Ud
+DgQWBBR1xUcQUvHyd5LD2sr9GbZy1KFvNDAfBgNVHSMEGDAWgBS7vMNHpeS8qcbD
+pHIMEI2iNeHI6DBXBggrBgEFBQcBAQRLMEkwIgYIKwYBBQUHMAGGFmh0dHA6Ly9y
+MTAuby5sZW5jci5vcmcwIwYIKwYBBQUHMAKGF2h0dHA6Ly9yMTAuaS5sZW5jci5v
+cmcvMBgGA1UdEQQRMA+CDXd3dy5hbnN2c2Eucm8wEwYDVR0gBAwwCjAIBgZngQwB
+AgEwggEFBgorBgEEAdZ5AgQCBIH2BIHzAPEAdgA/F0tP1yJHWJQdZRyEvg0S7ZA3
+fx+FauvBvyiF7PhkbgAAAZJmvTosAAAEAwBHMEUCIGTeBIa/X5JEc1HESXuN27Rs
+AlpPlZRm+v40FQXQX6VnAiEA/gcAwMexuB++i7kL3v6qp55pALUarXhy1qiuUHAG
+ei4AdwATSt8atZhCCXgMb+9MepGkFrcjSc5YV2rfrtqnwqvgIgAAAZJmvTrjAAAE
+AwBIMEYCIQDBq9UjNpthtubMMph8qRUEe6dBc30IjSNfAsbsODPK1gIhAOKuajf5
+70klPmGpoT2w0c4K0SbGO1nfpKQGBo7Rkp4uMA0GCSqGSIb3DQEBCwUAA4IBAQBu
+nm34tIO6MtncsOn650v5LnqoTpRxad1Ls9yrhuYa0M+g2b4i3kWp+RaF2Mhe+gUP
+ZxEI/F8i+PHNwJJ3WtqUl1y4nU2EkDczbyDSP6IOBVGKAOZnmGIfUrQIfmKbAzFV
+ocWiUjNcBoxba5BCMDKHkV7fNxPSgqiPhteF6jQTg8ldHANcrI5DIy79WPMuOAUs
+K0u0I2g6M5Bs5oxpYvVZPsKwSRme4md46BO3fAhrJxqdL+Tkft1Zw4v1vfBbD0Me
+UGp7j+dDWYIrUpXYY2iKU363hMCkiZF5PFuLiey93LSeuwAuGePe4ujZbr7fbRDQ
+9hsEcR3zffwAX3FeJeKJ
+-----END CERTIFICATE-----`
+
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM([]byte(letsEncryptRootCert)); !ok {
+		log.Fatal("Failed to append Let's Encrypt certificate")
+	}
+
+	return &tls.Config{
+		RootCAs:    certPool,
+		MinVersion: tls.VersionTLS12,
+	}
+}
+
+func CreateHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: CreateTLSConfig(),
+		},
+	}
+}

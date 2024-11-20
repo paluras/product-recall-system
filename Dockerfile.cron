@@ -1,11 +1,8 @@
-# Dockerfile.cron
 FROM golang:1.23
 
 WORKDIR /app
-# Copy entire project (since it shares packages)
 COPY . .
 
-# Build binaries
 RUN go mod download
 RUN go build -o scraper ./cmd/scrapper
 RUN go build -o notify ./cmd/notify
@@ -16,8 +13,20 @@ RUN apt-get update && apt-get install -y cron
 # Make script executable
 RUN chmod +x run-scraper-and-notify.sh
 
-# Set up cron job
-RUN echo "0 18 * * * /app/run-scraper-and-notify.sh >> /app/scraper.log 2>&1" > /etc/cron.d/scraper-cron
+# Create a wrapper script that includes environment variables
+RUN echo '#!/bin/bash\n\
+export DB_USER='${DB_USER}'\n\
+export DB_PASSWORD='${DB_PASSWORD}'\n\
+export DB_HOST=mysql\n\
+export DB_NAME='${DB_NAME}'\n\
+export DB_PORT=3306\n\
+/app/run-scraper-and-notify.sh\n\
+' > /app/wrapper.sh
+
+RUN chmod +x /app/wrapper.sh
+
+# Set up cron job using the wrapper
+RUN echo "0 */2 * * * /app/wrapper.sh >> /app/scraper.log 2>&1" > /etc/cron.d/scraper-cron
 RUN chmod 0644 /etc/cron.d/scraper-cron
 RUN crontab /etc/cron.d/scraper-cron
 

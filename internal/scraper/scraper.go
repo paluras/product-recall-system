@@ -1,13 +1,12 @@
 package scraper
 
 import (
-	"crypto/tls"
 	"log"
-	"net/http"
 	"sort"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/paluras/product-recall-system/internal/utils"
 )
 
 type ScrapedData struct {
@@ -20,13 +19,7 @@ const ScraperURL = "https://www.ansvsa.ro/informatii-pentru-public/produse-reche
 
 func Scrape() ([]ScrapedData, error) {
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+	client := utils.CreateHTTPClient()
 
 	resp, err := client.Get(ScraperURL)
 	if err != nil {
