@@ -1,0 +1,36 @@
+User-agent: *
+Allow: /
+
+# Main paths
+Allow: /static/
+Allow: /unsubscribe
+
+# Sitemaps
+Sitemap: https://produseretrase.eu/sitemap.xml
+
+# Crawl delay
+Crawl-delay: 10
+
+# Disallow patterns
+Disallow: /admin/
+Disallow: /api/
+Disallow: /private/
+Disallow: /*.php$
+Disallow: /*?*
+
+# Block common bots
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+# Block archive.org
+User-agent: archive.org_bot
+Disallow: /

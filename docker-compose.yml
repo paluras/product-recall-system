@@ -1,60 +1,48 @@
-version: '3'
+# docker-compose.yml
+version: '3.8'
 
 services:
-  mysql:
-    image: mysql:8.0
+  app:
+    build: .
+    container_name: product-recall-app
+    restart: unless-stopped
+    env_file: .env
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./scripts/migrations/dump.sql:/docker-entrypoint-initdb.d/dump.sql
-
-    ports:
-      - "3307:3306"
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  web:
-    build:
-      context: .
-      dockerfile: cmd/web/Dockerfile
+      - DB_HOST=mysql
     ports:
       - "54321:54321"
     depends_on:
       mysql:
         condition: service_healthy
-    command: ["./web",
-              "-dbuser", "${DB_USER}",
-              "-dbpass", "${DB_PASSWORD}",
-              "-dbhost", "mysql",
-              "-dbport", "3306",
-              "-dbname", "${DB_NAME}"]
+    networks:
+      - app-network
 
-  cron:
-    build:
-      context: .
-      dockerfile: Dockerfile.cron
-    depends_on:
-      mysql:
-        condition: service_healthy
+  mysql:
+    image: mysql:8.0
+    container_name: product-recall-mysql
+    restart: unless-stopped
     environment:
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_HOST=mysql
-      - DB_NAME=${DB_NAME}
-      - DB_PORT=3306
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "3307:3306"
     volumes:
-      - ./scraper.log:/app/scraper.log
+      - mysql_data:/var/lib/mysql
+      - ./scripts/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${DB_USER}", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
 
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   mysql_data:
+    driver: local

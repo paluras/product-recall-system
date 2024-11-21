@@ -1,7 +1,9 @@
 package scraper
 
 import (
-	"log"
+	"context"
+	"fmt"
+	"net/http"
 	"sort"
 	"time"
 
@@ -17,34 +19,49 @@ type ScrapedData struct {
 
 const ScraperURL = "https://www.ansvsa.ro/informatii-pentru-public/produse-rechemateretrase/"
 
-func Scrape() ([]ScrapedData, error) {
-
+func Scrape(ctx context.Context) ([]ScrapedData, error) {
 	client := utils.CreateHTTPClient()
 
-	resp, err := client.Get(ScraperURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", ScraperURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch page: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse HTML: %w", err)
 	}
 
 	var results []ScrapedData
 
 	doc.Find(".pt-cv-ifield").Each(func(i int, s *goquery.Selection) {
 
-		title := s.Find(".pt-cv-title a").Text()
-		link, _ := s.Find(".pt-cv-title a").Attr("href")
-		date := s.Find(".entry-date time").Text()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 
+		title := s.Find(".pt-cv-title a").Text()
+		link, exists := s.Find(".pt-cv-title a").Attr("href")
+		if !exists {
+			return
+		}
+
+		date := s.Find(".entry-date time").Text()
 		parsedDate, err := time.Parse("02/01/2006", date)
 		if err != nil {
-			log.Printf("Failed to parse date %q: %v", date, err)
-			parsedDate = time.Time{}
-
+			return
 		}
 
 		results = append(results, ScrapedData{
@@ -53,6 +70,10 @@ func Scrape() ([]ScrapedData, error) {
 			Date:  parsedDate,
 		})
 	})
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Date.After(results[j].Date)

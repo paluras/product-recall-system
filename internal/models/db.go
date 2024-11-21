@@ -1,18 +1,19 @@
+// internal/models/db.go
 package models
 
 import (
 	"database/sql"
-	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/paluras/product-recall-system/configs"
 )
 
 type DB struct {
 	*sql.DB
 }
 
-func NewDB(dsn string) (*DB, error) {
-	db, err := sql.Open("mysql", dsn)
+func NewDB(config configs.DatabaseConfig) (*DB, error) {
+	db, err := sql.Open("mysql", config.DSN())
 	if err != nil {
 		return nil, err
 	}
@@ -21,9 +22,9 @@ func NewDB(dsn string) (*DB, error) {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxOpenConns(config.MaxConns)
+	db.SetMaxIdleConns(config.MaxIdle)
+	db.SetConnMaxLifetime(config.Timeout)
 
 	return &DB{db}, nil
 }
