@@ -73,6 +73,7 @@ func main() {
 			Logger:    logger,
 			Addr:      cfg.Server.Host + ":" + cfg.Server.Port,
 			Templates: templates,
+			EmailSvc:  emailSvc,
 		}),
 		scraper: scraper.NewService(scraper.ServiceConfig{
 			DB:       db,

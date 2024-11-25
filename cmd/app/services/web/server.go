@@ -9,6 +9,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/paluras/product-recall-system/internal/models"
+	"github.com/paluras/product-recall-system/internal/notify"
 )
 
 type Server struct {
@@ -17,6 +18,7 @@ type Server struct {
 	session   *scs.SessionManager
 	templates *template.Template
 	addr      string
+	emailSvc  *notify.EmailService
 }
 
 type ServerConfig struct {
@@ -24,6 +26,7 @@ type ServerConfig struct {
 	Logger    *slog.Logger
 	Addr      string
 	Templates *template.Template
+	EmailSvc  *notify.EmailService
 }
 
 func NewServer(config ServerConfig) *Server {
@@ -39,6 +42,7 @@ func NewServer(config ServerConfig) *Server {
 		session:   session,
 		templates: config.Templates,
 		addr:      config.Addr,
+		emailSvc:  config.EmailSvc,
 	}
 }
 
@@ -68,3 +72,21 @@ func (s *Server) Run(ctx context.Context) error {
 		return srv.Shutdown(shutdownCtx)
 	}
 }
+
+// func (s *Server) cleanupRoutine(ctx context.Context) {
+// 	ticker := time.NewTicker(24 * time.Hour)
+// 	defer ticker.Stop()
+
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case <-ticker.C:
+// 			if affected, err := s.db.DeleteExpiredPendingSubscribers(); err != nil {
+// 				s.logger.Error("failed to cleanup expired verifications", "error", err)
+// 			} else if affected > 0 {
+// 				s.logger.Info("cleaned up expired verifications", "count", affected)
+// 			}
+// 		}
+// 	}
+// }

@@ -165,3 +165,94 @@ Pentru dezabonare, accesați: http://produseretrase/unsubscribe?token={{.Unsubsc
 
 	return nil
 }
+
+func (s *EmailService) SendVerificationEmail(email, token string) error {
+	confirmationTemplate := `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Confirmare Abonare</title>
+    </head>
+    <body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: monospace;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #fff; border: 3px solid #000; padding: 20px; box-sizing: border-box;">
+            <div style="margin-bottom: 30px; text-align: center;">
+                <div style="width: 60px; height: 60px; background: #000; position: relative; margin: 0 auto 20px;">
+                    <div style="position: absolute; color: #fff; font-size: 40px; font-weight: bold; top: 50%; left: 50%; transform: translate(-50%, -50%);">!</div>
+                </div>
+                <h1 style="margin: 0; font-size: clamp(20px, 5vw, 28px); text-transform: uppercase; border-bottom: 3px solid #000; padding-bottom: 20px;">Confirmare Abonare</h1>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 30px;">
+                <p style="margin-bottom: 20px;">Vă mulțumim pentru abonare. Pentru a finaliza procesul, vă rugăm să confirmați adresa de email.</p>
+                <a href="http://produseretrase.eu/confirm?token={{.Token}}"
+                   style="display: inline-block; background-color: #000; color: #fff; padding: 15px 30px; text-decoration: none; font-weight: bold;">
+                    Confirmă Abonarea
+                </a>
+            </div>
+
+            <div style="font-size: 14px; color: #666; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 3px solid #000;">
+                <p>Dacă nu ați solicitat această abonare, puteți ignora acest email.</p>
+            </div>
+        </div>
+    </body>
+    </html>`
+
+	textTemplate := `Confirmare Abonare
+
+Vă mulțumim pentru abonare. Pentru a finaliza procesul, vă rugăm să accesați următorul link:
+
+http://produseretrase.eu/confirm?token={{.Token}}
+
+Dacă nu ați solicitat această abonare, puteți ignora acest email.`
+
+	data := struct {
+		Token string
+	}{
+		Token: token,
+	}
+
+	htmlTmpl, err := template.New("confirmation_email").Parse(confirmationTemplate)
+	if err != nil {
+		return err
+	}
+	var htmlBuffer bytes.Buffer
+	if err := htmlTmpl.Execute(&htmlBuffer, data); err != nil {
+		return err
+	}
+	htmlBody := htmlBuffer.String()
+
+	textTmpl, err := template.New("confirmation_email_text").Parse(textTemplate)
+	if err != nil {
+		return err
+	}
+	var textBuffer bytes.Buffer
+	if err := textTmpl.Execute(&textBuffer, data); err != nil {
+		return err
+	}
+	textBody := textBuffer.String()
+
+	input := &ses.SendEmailInput{
+		Destination: &types.Destination{
+			ToAddresses: []string{email},
+		},
+		Message: &types.Message{
+			Body: &types.Body{
+				Html: &types.Content{
+					Data: &htmlBody,
+				},
+				Text: &types.Content{
+					Data: &textBody,
+				},
+			},
+			Subject: &types.Content{
+				Data: aws.String("Confirmă abonarea la Alerte Retragere Produse"),
+			},
+		},
+		Source: &s.config.FromEmail,
+	}
+
+	_, err = s.sesClient.SendEmail(context.TODO(), input)
+	return err
+}

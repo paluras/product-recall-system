@@ -39,7 +39,6 @@ func (s *Service) Run(ctx context.Context) error {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
-	// Run immediately on start
 	if err := s.sendNotifications(); err != nil {
 		s.logger.Error("initial notification failed", "error", err)
 	}
@@ -105,6 +104,39 @@ func (s *Service) sendNotifications() error {
 	s.logger.Info("notifications sent successfully",
 		"items_count", len(items),
 		"subscribers_count", len(subscribers))
+
+	return nil
+}
+
+func (s *Service) SendVerificationEmail(email string) error {
+	// Generate verification token
+	token, err := s.db.CreatePendingSubscriber(email)
+	if err != nil {
+		return err
+	}
+
+	// Send verification email
+	if err := s.emailSvc.SendVerificationEmail(email, token); err != nil {
+		return err
+	}
+
+	s.logger.Info("verification email sent",
+		"email", email)
+
+	return nil
+}
+
+func (s *Service) CleanupExpiredVerifications() error {
+	// Add this to your periodic tasks if needed
+	affected, err := s.db.DeleteExpiredPendingSubscribers()
+	if err != nil {
+		return err
+	}
+
+	if affected > 0 {
+		s.logger.Info("cleaned up expired verifications",
+			"count", affected)
+	}
 
 	return nil
 }

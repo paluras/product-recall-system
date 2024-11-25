@@ -1,4 +1,3 @@
-// internal/models/db.go
 package models
 
 import (

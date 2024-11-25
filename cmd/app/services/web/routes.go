@@ -2,6 +2,9 @@ package web
 
 import (
 	"net/http"
+	"time"
+
+	"github.com/paluras/product-recall-system/internal/middleware"
 )
 
 func (s *Server) routes() http.Handler {
@@ -13,7 +16,12 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /robots.txt", s.robots)
 
 	mux.HandleFunc("GET /", s.home)
-	mux.HandleFunc("POST /subscribe", s.postSubscriber)
+
+	limiter := middleware.NewRateLimiter(2, time.Minute, s.logger)
+
+	mux.Handle("POST /subscribe", limiter.Limit(http.HandlerFunc(s.postSubscriber)))
+	mux.HandleFunc("GET /confirm", s.confirmSubscription)
+
 	mux.HandleFunc("GET /unsubscribe", s.unsubscribe)
 
 	return secureHeaders(mux)

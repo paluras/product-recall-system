@@ -77,7 +77,6 @@ func Load() (*Config, error) {
 		TemplatesDir:    getEnvOrDefault("TEMPLATES_DIR", "./ui/html"),
 	}
 
-	// Database configuration
 	cfg.Database = DatabaseConfig{
 		Host:     getEnvOrDefault("DB_HOST", "localhost"),
 		Port:     getEnvOrDefault("DB_PORT", "3307"),
