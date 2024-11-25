@@ -3,13 +3,26 @@ package notify
 import (
 	"bytes"
 	"context"
-	"html/template"
+	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
+	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/ses/types"
 	"github.com/paluras/product-recall-system/internal/models"
+	"github.com/paluras/product-recall-system/internal/templates/email"
+)
+
+const (
+	defaultMaxSendRate  = 14                    // AWS SES default limit
+	defaultBatchSize    = 50                    // Process 50 emails at a time
+	defaultMaxRetries   = 3                     // Number of retries for failed sends
+	defaultSendInterval = time.Millisecond * 71 // ~14 emails per second
 )
 
 type AWSConfig struct {
@@ -18,9 +31,12 @@ type AWSConfig struct {
 }
 
 type EmailService struct {
-	sesClient *ses.Client
-	config    AWSConfig
-	db        *models.DB
+	sesClient    *ses.Client
+	config       AWSConfig
+	db           *models.DB
+	maxSendRate  int
+	sendInterval time.Duration
+	logger       *slog.Logger
 }
 
 func NewEmailService(awsConfig AWSConfig, db *models.DB) (*EmailService, error) {
@@ -32,227 +48,205 @@ func NewEmailService(awsConfig AWSConfig, db *models.DB) (*EmailService, error) 
 	}
 
 	return &EmailService{
-		sesClient: ses.NewFromConfig(cfg),
-		config:    awsConfig,
-		db:        db,
+		sesClient:    ses.NewFromConfig(cfg),
+		config:       awsConfig,
+		db:           db,
+		maxSendRate:  defaultMaxSendRate,
+		sendInterval: defaultSendInterval,
+		logger:       slog.Default(),
 	}, nil
 }
 
 func (s *EmailService) SendBatchNotification(recipients []string, items []models.ScrapedItem) error {
+	// Create channels for rate limiting and error handling
+	semaphore := make(chan struct{}, s.maxSendRate)
+	errorChan := make(chan error, len(recipients))
+	var wg sync.WaitGroup
 
-	tokenMap := make(map[string]string)
-	for _, recipient := range recipients {
-		token, err := s.db.CreateUnsubscribeToken(recipient)
-		if err != nil {
-			return err
-		}
-		tokenMap[recipient] = token
-	}
-
-	emailTemplate := `
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>Alerte Retragere Produse</title>
-	</head>
-	<body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: monospace;">
-		<div style="max-width: 600px; margin: 0 auto; background-color: #fff; border: 3px solid #000; padding: 20px; box-sizing: border-box;">
-			<!-- Logo and Header -->
-			<div style="margin-bottom: 30px; text-align: center;">
-				<div style="width: 60px; height: 60px; background: #000; position: relative; margin: 0 auto 20px;">
-					<div style="position: absolute; color: #fff; font-size: 40px; font-weight: bold; top: 50%; left: 50%; transform: translate(-50%, -50%);">!</div>
-				</div>
-				<h1 style="margin: 0; font-size: clamp(20px, 5vw, 28px); text-transform: uppercase; border-bottom: 3px solid #000; padding-bottom: 20px;">Retrageri Noi de Produse</h1>
-			</div>
-
-			<!-- Product Recalls -->
-			{{range .Items}}
-			<div style="margin-bottom: 30px; padding: 15px; border: 3px solid #000; background-color: #fff;">
-				<h2 style="margin: 0 0 15px 0; font-family: monospace; font-size: clamp(16px, 4vw, 20px); line-height: 1.4; word-break: break-word;">
-					<a href="{{.Link}}" style="color: #000; text-decoration: none; border-bottom: 2px solid #ff0000; display: inline-block;">
-						{{.Title}}
-					</a>
-				</h2>
-				<div style="font-family: monospace; color: #666; font-size: 14px; text-transform: uppercase;">
-					Data Publicării: {{.Date.Format "02/01/2006"}}
-				</div>
-			</div>
-			{{end}}
-
-			<!-- Footer -->
-			 <div style="margin-top: 30px; padding-top: 20px; border-top: 3px solid #000; font-size: 14px; color: #666; text-align: center;">
-        		<p style="margin: 0 0 10px 0;">Primiți acest email deoarece v-ați abonat la alertele noastre despre retragerile de produse.</p>
-        		<p style="margin: 0;">
-           			 <a href="http://produseretrase.eu/unsubscribe?token={{.UnsubscribeToken}}"
-               style="color: #ff0000; text-decoration: none; display: inline-block; border: 2px solid #ff0000; padding: 10px 20px; margin-top: 10px;">
-               Dezabonare
-           			 </a>
-        </p>
-    </div>
-		</div>
-	</body>
-	</html>`
-
-	textTemplate := `ALERTE RETRAGERI PRODUSE
-------------------------
-{{range .Items}}
-{{.Title}}
-Link: {{.Link}}
-Data: {{.Date.Format "02/01/2006"}}
-
-{{end}}
-
-Pentru dezabonare, accesați: http://produseretrase/unsubscribe?token={{.UnsubscribeToken}}`
-
-	for recipient, token := range tokenMap {
-		data := struct {
-			Items            []models.ScrapedItem
-			UnsubscribeToken string
-		}{
-			Items:            items,
-			UnsubscribeToken: token,
+	// Process recipients in chunks
+	for i := 0; i < len(recipients); i += defaultBatchSize {
+		end := i + defaultBatchSize
+		if end > len(recipients) {
+			end = len(recipients)
 		}
 
-		htmlTmpl, err := template.New("email").Parse(emailTemplate)
-		if err != nil {
-			return err
-		}
-		var htmlBuffer bytes.Buffer
-		err = htmlTmpl.Execute(&htmlBuffer, data)
-		if err != nil {
-			return err
-		}
-		htmlBody := htmlBuffer.String()
+		chunk := recipients[i:end]
+		s.logger.Info("processing email chunk",
+			"start", i,
+			"end", end,
+			"size", len(chunk))
 
-		textTmpl, err := template.New("email").Parse(textTemplate)
-		if err != nil {
-			return err
-		}
-		var textBuffer bytes.Buffer
-		err = textTmpl.Execute(&textBuffer, data)
-		if err != nil {
-			return err
-		}
-		textBody := textBuffer.String()
+		// Process each recipient in the chunk
+		for _, recipient := range chunk {
+			wg.Add(1)
+			go func(email string) {
+				defer wg.Done()
 
-		input := &ses.SendEmailInput{
-			Destination: &types.Destination{
-				BccAddresses: []string{recipient},
-			},
-			Message: &types.Message{
-				Body: &types.Body{
-					Html: &types.Content{
-						Data: &htmlBody,
-					},
-					Text: &types.Content{
-						Data: &textBody,
-					},
-				},
-				Subject: &types.Content{
-					Data: aws.String("Alerte Noi Retrageri de Produse"),
-				},
-			},
-			Source: &s.config.FromEmail,
+				// Implement rate limiting
+				semaphore <- struct{}{} // Acquire token
+				defer func() {
+					<-semaphore // Release token
+					time.Sleep(s.sendInterval)
+				}()
+
+				// Create unsubscribe token
+				token, err := s.db.CreateUnsubscribeToken(email)
+				if err != nil {
+					errorChan <- fmt.Errorf("failed to create token for %s: %w", email, err)
+					return
+				}
+
+				// Prepare email content
+				htmlBody, textBody, err := s.prepareEmailContent(items, token)
+				if err != nil {
+					errorChan <- fmt.Errorf("failed to prepare email for %s: %w", email, err)
+					return
+				}
+
+				// Send email with retry
+				if err := s.sendEmailWithRetry(email, htmlBody, textBody); err != nil {
+					errorChan <- fmt.Errorf("failed to send email to %s: %w", email, err)
+					return
+				}
+
+				s.logger.Info("email sent successfully", "recipient", email)
+			}(recipient)
 		}
 
-		_, err = s.sesClient.SendEmail(context.TODO(), input)
-		if err != nil {
-			return err
+		// Wait for current chunk to complete
+		wg.Wait()
+
+		// Check for any errors in the chunk
+		select {
+		case err := <-errorChan:
+			s.logger.Error("error in batch", "error", err)
+			// Continue processing despite errors
+		default:
+			// No errors, continue
 		}
 	}
 
-	return nil
+	// Final error check
+	select {
+	case err := <-errorChan:
+		return fmt.Errorf("batch notification failed: %w", err)
+	default:
+		return nil
+	}
 }
 
-func (s *EmailService) SendVerificationEmail(email, token string) error {
-	confirmationTemplate := `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Confirmare Abonare</title>
-    </head>
-    <body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: monospace;">
-        <div style="max-width: 600px; margin: 0 auto; background-color: #fff; border: 3px solid #000; padding: 20px; box-sizing: border-box;">
-            <div style="margin-bottom: 30px; text-align: center;">
-                <div style="width: 60px; height: 60px; background: #000; position: relative; margin: 0 auto 20px;">
-                    <div style="position: absolute; color: #fff; font-size: 40px; font-weight: bold; top: 50%; left: 50%; transform: translate(-50%, -50%);">!</div>
-                </div>
-                <h1 style="margin: 0; font-size: clamp(20px, 5vw, 28px); text-transform: uppercase; border-bottom: 3px solid #000; padding-bottom: 20px;">Confirmare Abonare</h1>
-            </div>
-
-            <div style="text-align: center; margin-bottom: 30px;">
-                <p style="margin-bottom: 20px;">Vă mulțumim pentru abonare. Pentru a finaliza procesul, vă rugăm să confirmați adresa de email.</p>
-                <a href="http://produseretrase.eu/confirm?token={{.Token}}"
-                   style="display: inline-block; background-color: #000; color: #fff; padding: 15px 30px; text-decoration: none; font-weight: bold;">
-                    Confirmă Abonarea
-                </a>
-            </div>
-
-            <div style="font-size: 14px; color: #666; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 3px solid #000;">
-                <p>Dacă nu ați solicitat această abonare, puteți ignora acest email.</p>
-            </div>
-        </div>
-    </body>
-    </html>`
-
-	textTemplate := `Confirmare Abonare
-
-Vă mulțumim pentru abonare. Pentru a finaliza procesul, vă rugăm să accesați următorul link:
-
-http://produseretrase.eu/confirm?token={{.Token}}
-
-Dacă nu ați solicitat această abonare, puteți ignora acest email.`
-
-	data := struct {
-		Token string
-	}{
-		Token: token,
-	}
-
-	htmlTmpl, err := template.New("confirmation_email").Parse(confirmationTemplate)
-	if err != nil {
-		return err
-	}
-	var htmlBuffer bytes.Buffer
-	if err := htmlTmpl.Execute(&htmlBuffer, data); err != nil {
-		return err
-	}
-	htmlBody := htmlBuffer.String()
-
-	textTmpl, err := template.New("confirmation_email_text").Parse(textTemplate)
-	if err != nil {
-		return err
-	}
-	var textBuffer bytes.Buffer
-	if err := textTmpl.Execute(&textBuffer, data); err != nil {
-		return err
-	}
-	textBody := textBuffer.String()
-
+func (s *EmailService) sendEmailWithRetry(recipient, htmlBody, textBody string) error {
 	input := &ses.SendEmailInput{
 		Destination: &types.Destination{
-			ToAddresses: []string{email},
+			ToAddresses: []string{recipient},
 		},
 		Message: &types.Message{
 			Body: &types.Body{
 				Html: &types.Content{
-					Data: &htmlBody,
+					Data: aws.String(htmlBody),
 				},
 				Text: &types.Content{
-					Data: &textBody,
+					Data: aws.String(textBody),
 				},
 			},
 			Subject: &types.Content{
+				// You might want to make this configurable
 				Data: aws.String("Confirmă abonarea la Alerte Retragere Produse"),
 			},
 		},
 		Source: &s.config.FromEmail,
 	}
 
-	_, err = s.sesClient.SendEmail(context.TODO(), input)
-	return err
+	var lastErr error
+	for i := 0; i < defaultMaxRetries; i++ {
+		if i > 0 {
+			backoff := time.Duration(1<<uint(i)) * time.Second
+			s.logger.Info("retrying send",
+				"recipient", recipient,
+				"attempt", i+1,
+				"backoff", backoff)
+			time.Sleep(backoff)
+		}
+
+		_, err := s.sesClient.SendEmail(context.Background(), input)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		if !isRetryableError(err) {
+			return err
+		}
+	}
+
+	return fmt.Errorf("max retries exceeded: %w", lastErr)
+}
+
+func isRetryableError(err error) bool {
+	return strings.Contains(err.Error(), "Throttling") ||
+		strings.Contains(err.Error(), "Maximum sending rate exceeded") ||
+		strings.Contains(err.Error(), "Network Error")
+}
+
+func (s *EmailService) prepareEmailContent(items []models.ScrapedItem, token string) (string, string, error) {
+	data := struct {
+		Items            []models.ScrapedItem
+		UnsubscribeToken string
+	}{
+		Items:            items,
+		UnsubscribeToken: token,
+	}
+
+	// Prepare HTML content
+	htmlTmpl, err := template.New("email").Parse(email.NotificationHTMLTemplate)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse HTML template: %w", err)
+	}
+	var htmlBuffer bytes.Buffer
+	if err := htmlTmpl.Execute(&htmlBuffer, data); err != nil {
+		return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
+	}
+
+	// Prepare text content
+	textTmpl, err := template.New("email").Parse(email.NotificationTextTemplate)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse text template: %w", err)
+	}
+	var textBuffer bytes.Buffer
+	if err := textTmpl.Execute(&textBuffer, data); err != nil {
+		return "", "", fmt.Errorf("failed to execute text template: %w", err)
+	}
+
+	return htmlBuffer.String(), textBuffer.String(), nil
+}
+
+func (s *EmailService) SendVerificationEmail(recipientEmail, token string) error {
+	data := struct {
+		Token string
+	}{
+		Token: token,
+	}
+
+	// Prepare HTML content
+	htmlTmpl, err := template.New("verification_email").Parse(email.VerificationHTMLTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse verification HTML template: %w", err)
+	}
+	var htmlBuffer bytes.Buffer
+	if err := htmlTmpl.Execute(&htmlBuffer, data); err != nil {
+		return fmt.Errorf("failed to execute verification HTML template: %w", err)
+	}
+
+	// Prepare text content
+	textTmpl, err := template.New("verification_email_text").Parse(email.VerificationTextTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse verification text template: %w", err)
+	}
+	var textBuffer bytes.Buffer
+	if err := textTmpl.Execute(&textBuffer, data); err != nil {
+		return fmt.Errorf("failed to execute verification text template: %w", err)
+	}
+
+	// Send email using the shared retry mechanism
+	return s.sendEmailWithRetry(recipientEmail, htmlBuffer.String(), textBuffer.String())
 }

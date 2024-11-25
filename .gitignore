@@ -3,3 +3,4 @@ scraper.log
 .env
 backupnginx.md
 scripts/migrations/dump.sql
+bulk_test.sh
