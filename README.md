@@ -16,5 +16,4 @@ A system that monitors, scrapes, and notifies subscribers about product recalls 
 - Go 1.23 or higher
 - MySQL 8.0
 - AWS 
-- Domain verified with AWS SES
 
