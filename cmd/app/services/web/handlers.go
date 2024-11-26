@@ -52,7 +52,7 @@ func (s *Server) unsubscribe(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Success string
 	}{
-		Success: "You have been successfully unsubscribed.",
+		Success: "V-ați dezabonat cu succes.",
 	}
 
 	err = s.templates.ExecuteTemplate(w, "unsubscribe.html", data)
@@ -64,7 +64,7 @@ func (s *Server) unsubscribe(w http.ResponseWriter, r *http.Request) {
 func (s *Server) postSubscriber(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		s.session.Put(r.Context(), "error", "Error parsing the form")
+		s.session.Put(r.Context(), "error", "Eroare la procesarea formularului")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -74,7 +74,7 @@ func (s *Server) postSubscriber(w http.ResponseWriter, r *http.Request) {
 	email := r.PostForm.Get("subscribe")
 
 	if !match(email, EmailRegex) {
-		s.session.Put(r.Context(), "error", "Invalid email format")
+		s.session.Put(r.Context(), "error", "Format invalid al emailului")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -89,19 +89,19 @@ func (s *Server) postSubscriber(w http.ResponseWriter, r *http.Request) {
 
 	pendingExists, err := s.db.PendingEmailExists(email)
 	if err != nil {
-		s.session.Put(r.Context(), "error", "Server error")
+		s.session.Put(r.Context(), "error", "Eroare de server")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	if subscriberExists {
-		s.session.Put(r.Context(), "error", "This email is already subscribed")
+		s.session.Put(r.Context(), "error", "Acest email este deja înregistrat")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	if pendingExists {
-		s.session.Put(r.Context(), "error", "Verification email already sent. Please check your inbox")
+		s.session.Put(r.Context(), "error", "Emailul de verificare a fost deja trimis. Vă rugăm verificați căsuța poștală")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -109,7 +109,7 @@ func (s *Server) postSubscriber(w http.ResponseWriter, r *http.Request) {
 	// Create pending subscription
 	token, err := s.db.CreatePendingSubscriber(email)
 	if err != nil {
-		s.session.Put(r.Context(), "error", "Failed to create subscription")
+		s.session.Put(r.Context(), "error", "Eroare la crearea abonamentului")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -121,12 +121,12 @@ func (s *Server) postSubscriber(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("failed to clean up pending subscriber", "error", cleanErr)
 		}
 		s.logger.Error("failed to send confirmation email", "error", err)
-		s.session.Put(r.Context(), "error", "Failed to send confirmation email")
+		s.session.Put(r.Context(), "error", "Eroare la trimiterea emailului de confirmare")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
-	s.session.Put(r.Context(), "success", "Please check your email to confirm your subscription")
+	s.session.Put(r.Context(), "success", "Verificați emailul pentru a confirma abonamentul")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -157,14 +157,14 @@ func (s *Server) confirmSubscription(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.Contains(err.Error(), "already subscribed") {
-			http.Error(w, "Email already confirmed", http.StatusConflict)
+			http.Error(w, "Email-ul a fost deja confirmat", http.StatusConflict)
 			return
 		}
 
-		http.Error(w, "Failed to confirm subscription", http.StatusInternalServerError)
+		http.Error(w, "Eroare la confirmarea abonamentului", http.StatusInternalServerError)
 		return
 	}
 
-	s.session.Put(r.Context(), "success", "Your subscription has been confirmed successfully!")
+	s.session.Put(r.Context(), "success", "Abonamentul dumneavoastră a fost confirmat cu succes!")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
