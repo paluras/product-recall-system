@@ -33,7 +33,7 @@ func main() {
 	session.Lifetime = 24 * time.Hour
 	session.Cookie.Persist = true
 	session.Cookie.SameSite = http.SameSiteLaxMode
-	session.Cookie.Secure = false // set to true in production
+	session.Cookie.Secure = true
 
 	templates, err := template.ParseFiles(
 		"./ui/html/pages/home.html",
@@ -57,15 +57,6 @@ func main() {
 		db:        db,
 		session:   session,
 		logger:    logger,
-	}
-
-	subscribers, err := app.db.GetSubscribersMail()
-	if err != nil {
-		logger.Info("No subscribers")
-	}
-
-	for _, subscriber := range subscribers {
-		logger.Info("Subscribers=", "subscribers", subscriber)
 	}
 
 	err = app.serve()

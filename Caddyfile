@@ -1,0 +1,3 @@
+produseretrase.eu, www.produseretrase.eu {
+	reverse_proxy web:54321
+}

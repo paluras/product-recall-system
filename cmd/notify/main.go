@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"os"
 
 	"github.com/paluras/product-recall-system/configs"
 	"github.com/paluras/product-recall-system/internal/models"
@@ -18,12 +18,17 @@ func main() {
 	}
 	defer db.Close()
 
-	awsConfig := notify.AWSConfig{
-		Region:    "eu-central-1",
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		log.Fatal("RESEND_API_KEY environment variable is required")
+	}
+
+	emailConfig := notify.EmailConfig{
+		APIKey:    apiKey,
 		FromEmail: "Latest Alert <alert@latest.produseretrase.eu>",
 	}
 
-	emailService, err := notify.NewEmailService(awsConfig, db)
+	emailService, err := notify.NewEmailService(emailConfig, db)
 	if err != nil {
 		log.Fatal("Failed to create email service:", err)
 	}
@@ -44,7 +49,7 @@ func main() {
 
 	testRecipients := subscribers
 
-	fmt.Printf("Subscriber %v", testRecipients)
+	log.Printf("Subscribers: %v", testRecipients)
 
 	err = emailService.SendBatchNotification(testRecipients, items)
 	if err != nil {

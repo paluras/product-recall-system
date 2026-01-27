@@ -2,39 +2,30 @@ package notify
 
 import (
 	"bytes"
-	"context"
 	"html/template"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/ses"
-	"github.com/aws/aws-sdk-go-v2/service/ses/types"
 	"github.com/paluras/product-recall-system/internal/models"
+	"github.com/resend/resend-go/v2"
 )
 
-type AWSConfig struct {
-	Region    string
+type EmailConfig struct {
+	APIKey    string
 	FromEmail string
 }
 
 type EmailService struct {
-	sesClient *ses.Client
-	config    AWSConfig
-	db        *models.DB
+	client *resend.Client
+	config EmailConfig
+	db     *models.DB
 }
 
-func NewEmailService(awsConfig AWSConfig, db *models.DB) (*EmailService, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion(awsConfig.Region),
-	)
-	if err != nil {
-		return nil, err
-	}
+func NewEmailService(cfg EmailConfig, db *models.DB) (*EmailService, error) {
+	client := resend.NewClient(cfg.APIKey)
 
 	return &EmailService{
-		sesClient: ses.NewFromConfig(cfg),
-		config:    awsConfig,
-		db:        db,
+		client: client,
+		config: cfg,
+		db:     db,
 	}, nil
 }
 
@@ -85,7 +76,7 @@ func (s *EmailService) SendBatchNotification(recipients []string, items []models
 			 <div style="margin-top: 30px; padding-top: 20px; border-top: 3px solid #000; font-size: 14px; color: #666; text-align: center;">
         		<p style="margin: 0 0 10px 0;">Primiți acest email deoarece v-ați abonat la alertele noastre despre retragerile de produse.</p>
         		<p style="margin: 0;">
-           			 <a href="http://produseretrase.eu/unsubscribe?token={{.UnsubscribeToken}}"
+           			 <a href="https://produseretrase.eu/unsubscribe?token={{.UnsubscribeToken}}"
                style="color: #ff0000; text-decoration: none; display: inline-block; border: 2px solid #ff0000; padding: 10px 20px; margin-top: 10px;">
                Dezabonare
            			 </a>
@@ -104,7 +95,7 @@ Data: {{.Date.Format "02/01/2006"}}
 
 {{end}}
 
-Pentru dezabonare, accesați: http://produseretrase/unsubscribe?token={{.UnsubscribeToken}}`
+Pentru dezabonare, accesați: https://produseretrase.eu/unsubscribe?token={{.UnsubscribeToken}}`
 
 	for recipient, token := range tokenMap {
 		data := struct {
@@ -137,27 +128,15 @@ Pentru dezabonare, accesați: http://produseretrase/unsubscribe?token={{.Unsubsc
 		}
 		textBody := textBuffer.String()
 
-		input := &ses.SendEmailInput{
-			Destination: &types.Destination{
-				BccAddresses: []string{recipient},
-			},
-			Message: &types.Message{
-				Body: &types.Body{
-					Html: &types.Content{
-						Data: &htmlBody,
-					},
-					Text: &types.Content{
-						Data: &textBody,
-					},
-				},
-				Subject: &types.Content{
-					Data: aws.String("Alerte Noi Retrageri de Produse"),
-				},
-			},
-			Source: &s.config.FromEmail,
+		params := &resend.SendEmailRequest{
+			From:    s.config.FromEmail,
+			To:      []string{recipient},
+			Subject: "Alerte Noi Retrageri de Produse",
+			Html:    htmlBody,
+			Text:    textBody,
 		}
 
-		_, err = s.sesClient.SendEmail(context.TODO(), input)
+		_, err = s.client.Emails.Send(params)
 		if err != nil {
 			return err
 		}
