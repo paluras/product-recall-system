@@ -11,15 +11,17 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/paluras/product-recall-system/configs"
 	"github.com/paluras/product-recall-system/internal/models"
+	"github.com/paluras/product-recall-system/internal/notify"
 )
 
 type application struct {
-	errorLog  *log.Logger
-	infoLog   *log.Logger
-	templates *template.Template
-	db        *models.DB
-	session   *scs.SessionManager
-	logger    *slog.Logger
+	errorLog     *log.Logger
+	infoLog      *log.Logger
+	templates    *template.Template
+	db           *models.DB
+	session      *scs.SessionManager
+	logger       *slog.Logger
+	emailService *notify.EmailService
 }
 
 func main() {
@@ -50,13 +52,26 @@ func main() {
 	}
 	defer db.Close()
 
+	resendKey := os.Getenv("RESEND_API_KEY")
+	var emailService *notify.EmailService
+	if resendKey != "" {
+		emailService, err = notify.NewEmailService(notify.EmailConfig{
+			APIKey:    resendKey,
+			FromEmail: "Latest Alert <alert@latest.produseretrase.eu>",
+		}, db)
+		if err != nil {
+			errorLog.Printf("Failed to initialize email service: %v", err)
+		}
+	}
+
 	app := &application{
-		errorLog:  errorLog,
-		infoLog:   infoLog,
-		templates: templates,
-		db:        db,
-		session:   session,
-		logger:    logger,
+		errorLog:     errorLog,
+		infoLog:      infoLog,
+		templates:    templates,
+		db:           db,
+		session:      session,
+		logger:       logger,
+		emailService: emailService,
 	}
 
 	err = app.serve()

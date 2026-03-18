@@ -95,6 +95,14 @@ func (app *application) PostSubscriber(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if app.emailService != nil {
+		go func() {
+			if err := app.emailService.SendWelcomeEmail(email); err != nil {
+				app.errorLog.Printf("Failed to send welcome email to %s: %v", email, err)
+			}
+		}()
+	}
+
 	app.session.Put(r.Context(), "success", "Successfully subscribed!")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

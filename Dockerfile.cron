@@ -13,22 +13,16 @@ RUN apt-get update && apt-get install -y cron
 # Make script executable
 RUN chmod +x run-scraper-and-notify.sh
 
-# Create a wrapper script that includes environment variables
+# Create entrypoint that writes env vars at runtime, then starts cron
 RUN echo '#!/bin/bash\n\
-export DB_USER='${DB_USER}'\n\
-export DB_PASSWORD='${DB_PASSWORD}'\n\
-export DB_HOST=mysql\n\
-export DB_NAME='${DB_NAME}'\n\
-export DB_PORT=3306\n\
-export RESEND_API_KEY='${RESEND_API_KEY}'\n\
-/app/run-scraper-and-notify.sh\n\
-' > /app/wrapper.sh
+# Write runtime env vars to a file cron can source\n\
+env >> /etc/environment\n\
+# Set up cron job\n\
+echo "0 */2 * * * . /etc/environment; /app/run-scraper-and-notify.sh >> /proc/1/fd/1 2>&1" | crontab -\n\
+# Start cron in foreground\n\
+cron -f\n\
+' > /app/entrypoint.sh
 
-RUN chmod +x /app/wrapper.sh
+RUN chmod +x /app/entrypoint.sh
 
-# Set up cron job using the wrapper
-RUN echo "0 */2 * * * /app/wrapper.sh >> /app/scraper.log 2>&1" > /etc/cron.d/scraper-cron
-RUN chmod 0644 /etc/cron.d/scraper-cron
-RUN crontab /etc/cron.d/scraper-cron
-
-CMD ["cron", "-f"]
+CMD ["/app/entrypoint.sh"]
