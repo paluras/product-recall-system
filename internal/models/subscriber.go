@@ -48,14 +48,34 @@ func (db *DB) UnsubscribeWithToken(token string) error {
 	return nil
 }
 
-func (db *DB) AddSubscriber(email string) error {
-	query := `INSERT INTO subscribers (email) VALUES (?)`
-	_, err := db.Exec(query, email)
-	return err
+func (db *DB) AddSubscriber(email string) (string, error) {
+	token := generateUnsubscribeToken()
+	if token == "" {
+		return "", fmt.Errorf("failed to generate confirmation token")
+	}
+	query := `INSERT INTO subscribers (email, confirmation_token, confirmed) VALUES (?, ?, FALSE)`
+	_, err := db.Exec(query, email, token)
+	return token, err
+}
+
+func (db *DB) ConfirmSubscriber(token string) error {
+	query := `UPDATE subscribers SET confirmed = TRUE, confirmation_token = NULL WHERE confirmation_token = ? AND confirmed = FALSE`
+	result, err := db.Exec(query, token)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("invalid or already used confirmation token")
+	}
+	return nil
 }
 
 func (db *DB) GetSubscribersMail() ([]string, error) {
-	query := `SELECT email FROM subscribers`
+	query := `SELECT email FROM subscribers WHERE confirmed = TRUE`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err

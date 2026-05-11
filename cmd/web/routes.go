@@ -7,6 +7,7 @@ func (app *application) routes() http.Handler {
 	mux.HandleFunc("GET /", app.home)
 	mux.HandleFunc("POST /subscribe", app.PostSubscriber)
 	mux.HandleFunc("GET /unsubscribe", app.unsubscribe)
+	mux.HandleFunc("GET /confirm", app.confirmSubscriber)
 
 	return mux
 }

@@ -22,6 +22,7 @@ type application struct {
 	session      *scs.SessionManager
 	logger       *slog.Logger
 	emailService *notify.EmailService
+	limiter      *rateLimiter
 }
 
 func main() {
@@ -72,6 +73,7 @@ func main() {
 		session:      session,
 		logger:       logger,
 		emailService: emailService,
+		limiter:      newRateLimiter(),
 	}
 
 	err = app.serve()

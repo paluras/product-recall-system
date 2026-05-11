@@ -66,6 +66,19 @@ func (app *application) PostSubscriber(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// honeypot: bots fill hidden fields, real users don't
+	if r.PostForm.Get("website") != "" {
+		app.session.Put(r.Context(), "success", "Verificați emailul pentru a confirma abonarea!")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !app.limiter.allow(realIP(r)) {
+		app.session.Put(r.Context(), "error", "Prea multe încercări. Vă rugăm așteptați înainte de a încerca din nou.")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
 	var EmailRegex = regexp.MustCompile(`^[a-zA-Z0-9.!#$%&'*+/=?^_` + "`" + `{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 
 	email := r.PostForm.Get("subscribe")
@@ -88,7 +101,7 @@ func (app *application) PostSubscriber(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = app.db.AddSubscriber(email)
+	confirmToken, err := app.db.AddSubscriber(email)
 	if err != nil {
 		app.session.Put(r.Context(), "error", "Error adding subscriber")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -97,14 +110,40 @@ func (app *application) PostSubscriber(w http.ResponseWriter, r *http.Request) {
 
 	if app.emailService != nil {
 		go func() {
-			if err := app.emailService.SendWelcomeEmail(email); err != nil {
-				app.errorLog.Printf("Failed to send welcome email to %s: %v", email, err)
+			if err := app.emailService.SendConfirmationEmail(email, confirmToken); err != nil {
+				app.errorLog.Printf("Failed to send confirmation email to %s: %v", email, err)
 			}
 		}()
 	}
 
-	app.session.Put(r.Context(), "success", "Successfully subscribed!")
+	app.session.Put(r.Context(), "success", "Verificați emailul pentru a confirma abonarea!")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (app *application) confirmSubscriber(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	err := app.db.ConfirmSubscriber(token)
+	if err != nil {
+		app.logger.Error("confirmation failed", "err", err)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	data := struct {
+		Success string
+	}{
+		Success: "Email confirmat cu succes! Vei primi notificări despre retragerile de produse.",
+	}
+
+	err = app.templates.ExecuteTemplate(w, "unsubscribe.html", data)
+	if err != nil {
+		app.serverError(w, r, err)
+	}
 }
 
 func Match(value string, rx *regexp.Regexp) bool {
