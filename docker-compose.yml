@@ -40,8 +40,7 @@ services:
         condition: service_healthy
     environment:
       - RESEND_API_KEY=${RESEND_API_KEY}
-    command: ["./web",
-              "-dbuser", "${DB_USER}",
+    command: ["-dbuser", "${DB_USER}",
               "-dbpass", "${DB_PASSWORD}",
               "-dbhost", "mysql",
               "-dbport", "3306",
