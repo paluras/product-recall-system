@@ -47,11 +47,7 @@ func main() {
 		log.Panic("Failed to fetch subscribers", err)
 	}
 
-	testRecipients := subscribers
-
-	log.Printf("Subscribers: %v", testRecipients)
-
-	err = emailService.SendBatchNotification(testRecipients, items)
+	err = emailService.SendBatchNotification(subscribers, items)
 	if err != nil {
 		log.Printf("Failed to send notifications: %v", err)
 		return

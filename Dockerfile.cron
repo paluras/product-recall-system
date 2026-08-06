@@ -1,28 +1,23 @@
-FROM golang:1.23
+FROM golang:1.23-bookworm AS build
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o /out/scraper ./cmd/scrapper
+RUN CGO_ENABLED=0 go build -o /out/notify ./cmd/notify
+
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends cron ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY . .
+COPY --from=build /out/scraper ./scraper
+COPY --from=build /out/notify ./notify
+COPY run-scraper-and-notify.sh ./run-scraper-and-notify.sh
+COPY docker/cron-entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./run-scraper-and-notify.sh ./entrypoint.sh
 
-RUN go mod download
-RUN go build -o scraper ./cmd/scrapper
-RUN go build -o notify ./cmd/notify
-
-# Install cron
-RUN apt-get update && apt-get install -y cron
-
-# Make script executable
-RUN chmod +x run-scraper-and-notify.sh
-
-# Create entrypoint that writes env vars at runtime, then starts cron
-RUN echo '#!/bin/bash\n\
-# Write runtime env vars to a file cron can source\n\
-env >> /etc/environment\n\
-# Set up cron job\n\
-echo "0 */2 * * * . /etc/environment; /app/run-scraper-and-notify.sh >> /proc/1/fd/1 2>&1" | crontab -\n\
-# Start cron in foreground\n\
-cron -f\n\
-' > /app/entrypoint.sh
-
-RUN chmod +x /app/entrypoint.sh
-
-CMD ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
