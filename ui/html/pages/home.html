@@ -56,6 +56,14 @@
         padding-bottom: 1rem;
       }
 
+      .notice {
+        border: 2px solid var(--accent);
+        padding: 1rem;
+        margin-bottom: 2rem;
+        font-size: 0.95rem;
+        line-height: 1.4;
+      }
+
       .subscribe-container {
         border: 3px solid var(--black);
         padding: 2rem;
@@ -207,6 +215,10 @@
   <body>
     <div class="logo"></div>
     <h1>PRODUSE RETRASE</h1>
+    <p class="notice">
+      Notă: M-am mutat pentru o perioada in alta tara si nu mai pot sa
+      administrez aplicatia. :/
+    </p>
     {{if .Error}}
     <div
       style="
@@ -245,9 +257,24 @@
             required
           />
         </div>
-        <div style="position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden;" aria-hidden="true">
+        <div
+          style="
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+            height: 0;
+            overflow: hidden;
+          "
+          aria-hidden="true"
+        >
           <label for="website">Website</label>
-          <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+          <input
+            type="text"
+            id="website"
+            name="website"
+            tabindex="-1"
+            autocomplete="off"
+          />
         </div>
         <button type="submit">Subscribe</button>
       </form>
